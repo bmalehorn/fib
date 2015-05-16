@@ -9,29 +9,15 @@ definition fib : ℕ → ℕ,
            fib (succ (succ n)) := fib n + fib (succ n)
 
 
-theorem geq_zero : ∀ n : ℕ, 0 ≤ fib n,
-        geq_zero 0 := calc 0 ≤ fib 0 : zero_le,
-        geq_zero 1 := calc 0 ≤ fib 1 : zero_le,
-        geq_zero (succ (succ n)) :=
-          have H : 0 ≤ fib n, from geq_zero n,
-          have H' : 0 ≤ fib (succ n), from geq_zero (succ n),
-          show 0 ≤ fib (succ (succ n)), from
-           (calc
-              0   ≤ 0 + 0 : le_add_right
-              ... ≤ (fib n) + 0 : H
-              ... ≤ (fib n) + (fib (succ n)) : add_le_add_left H'
-              ... = fib (succ (succ n)) : rfl)
-
-
 /-
    fₙ ≤ fₙ₊₁
 -/
-theorem nondecreasing : ∀ n : ℕ, fib n ≤ fib (succ n),
-        nondecreasing 0 :=
+private theorem nondecreasing'' : ∀ n : ℕ, fib n ≤ fib (succ n),
+        nondecreasing'' 0 :=
           (calc fib 0 = 0 : rfl
                 ...   ≤ 0 + 1 : le_add_right
                 ...   = fib 1 : rfl),
-        nondecreasing (succ n) :=
+        nondecreasing'' (succ n) :=
           (calc fib (succ n) ≤ (fib n) + (fib (succ n)) : le_add_left)
 
 /-
@@ -44,7 +30,7 @@ theorem pos : ∀ n : ℕ, 1 ≤ fib (succ n),
               ... ≤ fib (succ 0) + 0 : le_add_right),
         pos (succ n) :=
           (calc 1 ≤ fib (succ n) : pos n
-              ... ≤ fib (succ (succ n)) : nondecreasing (succ n))
+              ... ≤ fib (succ (succ n)) : nondecreasing'' (succ n))
 
 
 /-
@@ -102,6 +88,11 @@ theorem sum_squared_identity
  |                                                                     |
  --------------------------------------------------------------------  -/
 
+
+------------------------------------------
+-- definitions
+------------------------------------------
+
 /-
   Note that we start at fib 2 instead of fib 0.
      1, 2, 3, 5, ...
@@ -123,8 +114,12 @@ inductive nonadjacent : list ℕ → Prop :=
              nonadjacent (n :: m :: xs)
 
 
+------------------------------------------
+-- helpers
+------------------------------------------
+
 -- writing this is faster than trying to find it in nat.lean.
-definition eq_to_le {a b : ℕ} (H: a = b) : a ≤ b :=
+private definition eq_to_le {a b : ℕ} (H: a = b) : a ≤ b :=
            (calc a = b : H
                ... ≤ b : le.refl)
 
@@ -143,7 +138,8 @@ theorem straddle : ∀ n : ℕ, ∃ i : ℕ, fib (succ (succ i)) ≤ succ n
             assume H : fib (succ (succ i)) ≤ succ n
                        ∧ succ n < fib (succ (succ (succ i))),
             have Hl : fib (succ (succ i)) ≤ succ n, from and.elim_left H,
-            have Hr : succ n < fib (succ (succ (succ i))), from and.elim_right H,
+            have Hr : succ n < fib (succ (succ (succ i))),
+              from and.elim_right H,
             have Ha : succ (succ n) = fib (succ (succ (succ i))) ∨
                       succ (succ n) < fib (succ (succ (succ i))),
                       from eq_or_lt_of_le (succ_le_of_lt Hr),
@@ -167,39 +163,28 @@ theorem straddle : ∀ n : ℕ, ∃ i : ℕ, fib (succ (succ i)) ≤ succ n
                (and.intro (le_of_lt (lt_succ_of_le Hl)) Hlt)))
 
 
--- probably don't need this
-theorem ascending : ∀ (n : ℕ),
-                        fib (succ (succ n)) < fib (succ (succ (succ n))),
-        ascending n :=
- (calc fib (succ (succ n)) < succ (fib (succ (succ n)))
-                                         : lt.base (fib (succ (succ n)))
-                              ... = fib (succ (succ n)) + 1 : rfl
-                              ... ≤ fib (succ (succ n)) + fib (succ n)
-                                         : add_le_add_left (pos n)
-                                           (fib (succ (succ n)))
-                              ... = fib (succ (succ (succ n))) : add.comm)
+theorem nondecreasing' : ∀ (a : ℕ) (b : ℕ), fib a ≤ fib (a + b),
 
-
-theorem nondecreasing'' : ∀ (a : ℕ) (b : ℕ), fib a ≤ fib (a + b),
-
-        nondecreasing'' a 0 :=
+        nondecreasing' a 0 :=
         have H: fib (a+0) < fib(a+0) ∨ fib(a+0) = fib(a+0),
           from or.intro_right (fib (a+0) < fib (a+0)) rfl,
           calc fib a = fib (a+0) : rfl
                  ... ≤ fib (a+0) : le_of_lt_or_eq H,
 
-        nondecreasing'' a (succ b) :=
-        have Hih : fib a ≤ fib (a+b), from nondecreasing'' a b,
-        calc fib a ≤ fib (a+b) : nondecreasing'' a b
-               ... ≤ fib (succ (a+b)) : nondecreasing (a+b)
+        nondecreasing' a (succ b) :=
+        calc fib a ≤ fib (a+b) : nondecreasing' a b
+               ... ≤ fib (succ (a+b)) : nondecreasing'' (a+b)
                ... = fib (a+(succ b)) : rfl
 
-theorem nondecreasing' : ∀ (a : ℕ) (b : ℕ) (H : a ≤ b), fib a ≤ fib b,
-        nondecreasing' a b H :=
-        calc fib a ≤ fib (a+(b-a)) : nondecreasing'' a (b-a)
+theorem nondecreasing : ∀ (a : ℕ) (b : ℕ) (H : a ≤ b), fib a ≤ fib b,
+        nondecreasing a b H :=
+        calc fib a ≤ fib (a+(b-a)) : nondecreasing' a (b-a)
                ... = fib b : add_sub_of_le H
 
-theorem zek_helper : ∀ (xs : list ℕ) (i : ℕ) (n : ℕ)
+
+
+-- helper function, passed in closure elements of weak_zeckendorf'.
+private theorem zek_helper : ∀ (xs : list ℕ) (i : ℕ) (n : ℕ)
       (Hfibsum : fibsum (i::xs) = succ n) (Htail : nonadjacent xs)
       (Hi : fib (succ (succ i)) ≤ succ n ∧ succ n < fib (succ (succ (succ i)))),
       nonadjacent (i::xs),
@@ -213,7 +198,7 @@ theorem zek_helper : ∀ (xs : list ℕ) (i : ℕ) (n : ℕ)
               have Hgt : i < succ (succ y), from lt_of_not_le Hfalse,
               have Hge : succ i ≤ succ (succ y), from succ_le_of_lt Hgt,
               have Hfibge : fib (succ i) ≤ fib (succ (succ y)),
-                   from nondecreasing' (succ i) (succ (succ y)) Hge,
+                   from nondecreasing (succ i) (succ (succ y)) Hge,
               have Hlies : succ n < fibsum (i::y::ys),
               from calc succ n < fib (succ (succ (succ i))) : and.elim_right Hi
                            ... = fib (succ i) + fib (succ (succ i)) : rfl
@@ -234,7 +219,8 @@ theorem zek_helper : ∀ (xs : list ℕ) (i : ℕ) (n : ℕ)
                absurd Hfibsum' Huh'),
          nonadjacent.cons i y ys Hhead Htail
 
-theorem weak_zeckendorf' : ∀ (n : ℕ) (c : ℕ) (H : n ≤ c),
+
+private theorem weak_zeckendorf' : ∀ (n : ℕ) (c : ℕ) (H : n ≤ c),
                           ∃ xs : list ℕ, nonadjacent xs ∧ fibsum xs = n,
 
         weak_zeckendorf' (succ n) 0 H :=
@@ -275,8 +261,13 @@ theorem weak_zeckendorf' : ∀ (n : ℕ) (c : ℕ) (H : n ≤ c),
                       ... = succ n : add_sub_of_le (and.elim_left Hi),
            -- 1/2
            have Hnonadjacent : nonadjacent (i::xs),
-           from zek_helper xs i n Hfibsum (and.elim_left Hxs) Hi,
+             from zek_helper xs i n Hfibsum (and.elim_left Hxs) Hi,
+
            exists.intro (i::xs) (and.intro Hnonadjacent Hfibsum)))
+
+------------------------------------------
+-- zeckendorf
+------------------------------------------
 
 theorem weak_zeckendorf : ∀ (n : ℕ),
                           ∃ xs : list ℕ, nonadjacent xs ∧ fibsum xs = n,
