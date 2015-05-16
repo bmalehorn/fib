@@ -1,6 +1,7 @@
 import logic standard classical data.nat data.list
-
 open decidable nat list
+
+set_option pp.coercions false
 
 namespace fib
 
@@ -124,8 +125,6 @@ inductive nonadjacent : list ℕ → Prop :=
              nonadjacent (n :: m :: xs)
 
 
-check nonadjacent.rec_on
-
 -- writing this is faster than trying to find it in nat.lean.
 definition eq_to_le {a b : ℕ} (H: a = b) : a ≤ b :=
            (calc a = b : H
@@ -186,6 +185,39 @@ theorem ascending : ∀ (n : ℕ),
 theorem nondecreasing' : ∀ (a : ℕ) (b : ℕ) (H : a ≤ b), fib a ≤ fib b,
       nondecreasing' a b H := sorry
 
+theorem zek_helper : ∀ (xs : list ℕ) (i : ℕ) (n : ℕ)
+      (Hfibsum : fibsum (i::xs) = succ n) (Htail : nonadjacent xs)
+      (Hi : fib (succ (succ i)) ≤ succ n ∧ succ n < fib (succ (succ (succ i)))),
+      nonadjacent (i::xs),
+      zek_helper nil i n Hfibsum Htail Hi := nonadjacent.singleton i,
+      zek_helper (y::ys) i n Hfibsum Htail Hi :=
+        have Hhead : succ (succ y) ≤ i,
+         from by_contradiction
+           (assume (Hfalse : ¬ (succ (succ y)) ≤ i),
+              have Hgt : i < succ (succ y), from lt_of_not_le Hfalse,
+              have Hge : succ i ≤ succ (succ y), from succ_le_of_lt Hgt,
+              have Hfibge : fib (succ i) ≤ fib (succ (succ y)),
+                   from nondecreasing' (succ i) (succ (succ y)) Hge,
+              have Hlies : succ n < fibsum (i::y::ys),
+              from calc succ n < fib (succ (succ (succ i))) : and.elim_right Hi
+                           ... = fib (succ i) + fib (succ (succ i)) : rfl
+                           ... = fib (succ (succ i)) + fib (succ i) : add.comm
+                           ... ≤ fib (succ (succ i)) + fib (succ (succ y))
+                                  : add_le_add_left Hfibge
+                           ... ≤ (fib (succ (succ i)) + fib (succ (succ y))) +
+                                 fibsum ys : le_add_right
+                           ... = fib (succ (succ i)) +
+                                 (fib (succ (succ y)) + fibsum ys) : add.assoc
+                           ... = fibsum (i::y::ys) : rfl,
+               have Huh : succ n ≠ fibsum (i::y::ys),
+                from nat.ne_of_lt Hlies,
+               have Huh' : ¬ (succ n = fibsum (i::y::ys)), from Huh,
+               have Hfibsum' : succ n = fibsum (i::y::ys), from
+                 calc succ n = succ n : rfl
+                         ... = fibsum (i::y::ys) : Hfibsum,
+               absurd Hfibsum' Huh'),
+         nonadjacent.cons i y ys Hhead Htail
+
 theorem weak_zeckendorf' : ∀ (n : ℕ) (c : ℕ) (H : n ≤ c),
                           ∃ xs : list ℕ, nonadjacent xs ∧ fibsum xs = n,
 
@@ -227,41 +259,42 @@ theorem weak_zeckendorf' : ∀ (n : ℕ) (c : ℕ) (H : n ≤ c),
                       ... = succ n : add_sub_of_le (and.elim_left Hi),
            -- 1/2
            have Hnonadjacent : nonadjacent (i::xs),
-           from
-             list.rec_on xs
-             (nonadjacent.singleton i)
-             (take y ys recval,
-             have Htail : nonadjacent (y::ys), from sorry,
-             have Hhead : succ (succ y) ≤ i, from by_contradiction
-             (assume (Hfalse : ¬ (succ (succ y)) ≤ i),
-              have Hgt : i < succ (succ y), from lt_of_not_le Hfalse,
-              have Hge : succ i ≤ succ (succ y), from succ_le_of_lt Hgt,
-              have Hfibge : fib (succ i) ≤ fib (succ (succ y)),
-                   from nondecreasing' (succ i) (succ (succ y)) Hge,
-              have Hlies : succ n < fibsum (i::xs),
-              from calc succ n < fib (succ (succ (succ i))) : and.elim_right Hi
-                           ... = fib (succ i) + fib (succ (succ i)) : rfl
-                           ... = fib (succ (succ i)) + fib (succ i) : add.comm
-                           ... ≤ fib (succ (succ i)) + fib (succ (succ y))
-                                  : add_le_add_left Hfibge
-                           ... ≤ (fib (succ (succ i)) + fib (succ (succ y))) +
-                                 fibsum ys : le_add_right
-                           ... = fib (succ (succ i)) +
-                                 (fib (succ (succ y)) + fibsum ys) : add.assoc
-                           ... = fibsum (i::y::ys) : rfl
-                           ... = fibsum (i::xs) : sorry,
-               have Huh : succ n ≠ fibsum (i::xs),
-                 -- from ne_of_lt Hlies,
-                 from sorry,
-               have Huh' : ¬ (succ n = fibsum (i::xs)), from Huh,
-               have Hfibsum' : succ n = fibsum (i::xs), from Hfibsum,
-               have Hfibsum'' : ¬ (succ n < fibsum (i::xs)), from sorry,
-               absurd Hfibsum' Huh'
-             ),
-             nonadjacent.cons i y ys Hhead Htail),
-           -- 1
+           from zek_helper xs i n Hfibsum (and.elim_left Hxs) Hi,
+             -- list.rec_on xs
+             -- (nonadjacent.singleton i)
+             -- (take y ys recval,
+             -- -- since xs = y::ys, and nonadjacent xs, nonadjacent (y::ys) : rfl
+             -- have Htail : nonadjacent (y::ys), from recval,
+             -- have Hhead : succ (succ y) ≤ i, from by_contradiction
+             -- (assume (Hfalse : ¬ (succ (succ y)) ≤ i),
+             --  have Hgt : i < succ (succ y), from lt_of_not_le Hfalse,
+             --  have Hge : succ i ≤ succ (succ y), from succ_le_of_lt Hgt,
+             --  have Hfibge : fib (succ i) ≤ fib (succ (succ y)),
+             --       from nondecreasing' (succ i) (succ (succ y)) Hge,
+             --  have Hlies : succ n < fibsum (i::xs),
+             --  from calc succ n < fib (succ (succ (succ i))) : and.elim_right Hi
+             --               ... = fib (succ i) + fib (succ (succ i)) : rfl
+             --               ... = fib (succ (succ i)) + fib (succ i) : add.comm
+             --               ... ≤ fib (succ (succ i)) + fib (succ (succ y))
+             --                      : add_le_add_left Hfibge
+             --               ... ≤ (fib (succ (succ i)) + fib (succ (succ y))) +
+             --                     fibsum ys : le_add_right
+             --               ... = fib (succ (succ i)) +
+             --                     (fib (succ (succ y)) + fibsum ys) : add.assoc
+             --               ... = fibsum (i::y::ys) : rfl
+             --               ... = fibsum (i::xs) : sorry,
+             --   have Huh : succ n ≠ fibsum (i::xs),
+             --    from nat.ne_of_lt Hlies,
+             --    -- from sorry,
+             --   have Huh' : ¬ (succ n = fibsum (i::xs)), from Huh,
+             --   have Hfibsum' : succ n = fibsum (i::xs), from Hfibsum,
+             --   have Hfibsum'' : ¬ (succ n < fibsum (i::xs)), from sorry,
+             --   absurd Hfibsum' Huh'
+             -- ),
+             -- nonadjacent.cons i y ys Hhead Htail),
            exists.intro (i::xs) (and.intro Hnonadjacent Hfibsum)))
 
+have H : 1 < 2, from sorry
 
 theorem weak_zeckendorf : ∀ (n : ℕ),
                           ∃ xs : list ℕ, nonadjacent xs ∧ fibsum xs = n,
